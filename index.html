@@ -1,0 +1,112 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Isometric Cube Pulse & Rotate Grid</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #F5E7DE;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+    #field-container {
+      position: absolute;
+      top: 50px;
+      left: 50px;
+      width: 400px;
+      height: 400px;
+    }
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="field-container"></div>
+
+  <script type="module">
+    import * as THREE from 'https://cdn.skypack.dev/three@0.152.2';
+
+    // Setup
+    const container = document.getElementById('field-container');
+    const scene = new THREE.Scene();
+    const aspect = container.clientWidth / container.clientHeight;
+    const d = 30;
+    const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+    camera.position.set(d, d, d);
+    camera.lookAt(scene.position);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
+
+    // Grid
+    const spacing = 12;
+    const count = 1; // 3x3
+    const cubes = [];
+
+    const material = new THREE.LineBasicMaterial({ color: 0xC46F52 });
+    const geometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(6, 6, 6));
+
+    for (let x = -count; x <= count; x++) {
+      for (let y = -count; y <= count; y++) {
+        const cube = new THREE.LineSegments(geometry, material.clone());
+        cube.position.set(x * spacing, y * spacing, 0);
+        scene.add(cube);
+        cubes.push(cube);
+      }
+    }
+
+    // Interaction
+    const mouse = new THREE.Vector2();
+    const target = new THREE.Vector3();
+    const raycaster = new THREE.Raycaster();
+
+    window.addEventListener('mousemove', (event) => {
+      const rect = container.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / rect.width;
+      const y = (event.clientY - rect.top) / rect.height;
+      mouse.x = x * 2 - 1;
+      mouse.y = -(y * 2 - 1);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Project cursor to Z=0 plane
+      raycaster.setFromCamera(mouse, camera);
+      const planeZ = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+      raycaster.ray.intersectPlane(planeZ, target);
+
+      // Update cubes
+      cubes.forEach(cube => {
+        const dist = cube.position.distanceTo(target);
+        const scale = 1 + Math.max(0, 1 - dist / 15) * 0.5;
+        cube.scale.setScalar(scale);
+        const m = new THREE.Matrix4().lookAt(cube.position, target, new THREE.Vector3(0,1,0));
+        const q = new THREE.Quaternion().setFromRotationMatrix(m);
+        cube.quaternion.slerp(q, 0.1);
+      });
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Resize
+    window.addEventListener('resize', () => {
+      const a = container.clientWidth / container.clientHeight;
+      camera.left = -d * a;
+      camera.right = d * a;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+  </script>
+</body>
+</html>
